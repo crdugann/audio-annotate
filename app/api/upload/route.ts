@@ -43,6 +43,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: uploadError.message }, { status: 500 });
     }
 
+    // Version tracking: same filename (case-insensitive) = same version group
+    const escapedName = file.name.replace(/[%_\\]/g, (c) => `\\${c}`);
+    const { data: existing } = await supabase
+      .from('audio_files')
+      .select('id, version, version_group_id')
+      .ilike('filename', escapedName)
+      .order('version', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let version = 1;
+    let versionGroupId: string | null = null;
+
+    if (existing) {
+      version = (existing.version ?? 1) + 1;
+      versionGroupId = existing.version_group_id ?? existing.id;
+    }
+
     const { data: audioData, error: dbError } = await supabase
       .from('audio_files')
       .insert({
@@ -50,12 +68,22 @@ export async function POST(request: NextRequest) {
         filename: file.name,
         storage_path: storagePath,
         duration: null,
+        version,
+        version_group_id: versionGroupId,
       })
       .select('id')
       .single();
 
     if (dbError) {
       return NextResponse.json({ error: dbError.message }, { status: 500 });
+    }
+
+    // First version in group: set version_group_id to own id
+    if (!versionGroupId) {
+      await supabase
+        .from('audio_files')
+        .update({ version_group_id: audioData.id })
+        .eq('id', audioData.id);
     }
 
     return NextResponse.json({ slug, id: audioData.id });

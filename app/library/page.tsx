@@ -11,14 +11,33 @@ type AudioFile = {
   storage_path: string;
   duration: number | null;
   created_at: string;
+  version?: number;
+  version_group_id?: string | null;
+  version_count?: number;
+  has_multiple_versions?: boolean;
   annotation_count?: number;
   annotated_duration?: number;
   annotated_percentage?: number | null;
 };
 
+function groupFilesByVersion(files: AudioFile[]): Map<string, AudioFile[]> {
+  const groups = new Map<string, AudioFile[]>();
+  for (const f of files) {
+    const gid = f.version_group_id ?? f.id;
+    const list = groups.get(gid) ?? [];
+    list.push(f);
+    groups.set(gid, list);
+  }
+  for (const list of groups.values()) {
+    list.sort((a, b) => (a.version ?? 1) - (b.version ?? 1));
+  }
+  return groups;
+}
+
 export default function LibraryPage() {
   const [files, setFiles] = useState<AudioFile[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [annotations, setAnnotations] = useState<AnnotationWithFile[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(true);
   const [loadingAnnotations, setLoadingAnnotations] = useState(false);
@@ -68,9 +87,10 @@ export default function LibraryPage() {
         const map = Object.fromEntries(files.map((f) => [f.id, f]));
         const anns: AnnotationWithFile[] = (data ?? []).map((a: AnnotationWithFile) => {
           const f = map[a.audio_id];
+          const versionLabel = f?.version != null ? ` (v${f.version})` : '';
           return {
             ...a,
-            filename: f?.filename,
+            filename: f?.filename ? `${f.filename}${versionLabel}` : undefined,
             slug: f?.slug,
             url: f?.slug ? `/a/${f.slug}?t=${a.start_time}` : undefined,
           };
@@ -86,13 +106,35 @@ export default function LibraryPage() {
     return () => { cancelled = true; };
   }, [selectedIds, files]);
 
-  const toggleFile = (id: string) => {
+  const groups = groupFilesByVersion(files);
+  const groupEntries = Array.from(groups.entries());
+
+  const toggleGroup = (groupId: string) => {
+    const versionIds = groups.get(groupId)?.map((f) => f.id) ?? [];
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const allSelected = versionIds.every((id) => next.has(id));
+      if (allSelected) {
+        versionIds.forEach((id) => next.delete(id));
+      } else {
+        versionIds.forEach((id) => next.add(id));
+      }
       return next;
     });
+  };
+
+  const toggleExpanded = (groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  };
+
+  const isGroupSelected = (groupId: string) => {
+    const versionIds = groups.get(groupId)?.map((f) => f.id) ?? [];
+    return versionIds.length > 0 && versionIds.every((id) => selectedIds.has(id));
   };
 
   const selectAll = () => {
@@ -154,46 +196,84 @@ export default function LibraryPage() {
                   Select none
                 </button>
               </div>
-              <ul className="space-y-2 max-h-[300px] overflow-y-auto border rounded-lg p-2 bg-white dark:bg-gray-800/50">
-                {files.map((f) => {
-                  const hasAnnotations = (f.annotation_count ?? 0) > 0;
-                  const pct = f.annotated_percentage;
+              <ul className="space-y-1 max-h-[300px] overflow-y-auto border rounded-lg p-2 bg-white dark:bg-gray-800/50">
+                {groupEntries.map(([groupId, versions]) => {
+                  const primary = versions[0]!;
+                  const hasMultiple = versions.length > 1;
+                  const expanded = expandedGroups.has(groupId);
+                  const groupSelected = isGroupSelected(groupId);
+                  const totalNotes = versions.reduce((s, v) => s + (v.annotation_count ?? 0), 0);
                   return (
-                    <li key={f.id} className="flex items-start gap-2 py-1">
-                      <input
-                        type="checkbox"
-                        id={`file-${f.id}`}
-                        checked={selectedIds.has(f.id)}
-                        onChange={() => toggleFile(f.id)}
-                        className="rounded border-gray-300 mt-0.5"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <label
-                          htmlFor={`file-${f.id}`}
-                          className="text-sm truncate block cursor-pointer"
-                          title={f.filename}
-                        >
-                          {f.filename}
-                        </label>
-                        {hasAnnotations && (
-                          <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                            <span className="text-green-600 dark:text-green-400 font-medium">
-                              {f.annotation_count} note{f.annotation_count !== 1 ? 's' : ''}
-                            </span>
-                            {pct != null && (
-                              <span>
-                                • {pct}% annotated
+                    <li key={groupId} className="py-1">
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          id={`group-${groupId}`}
+                          checked={groupSelected}
+                          onChange={() => toggleGroup(groupId)}
+                          className="rounded border-gray-300 mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <label
+                              htmlFor={`group-${groupId}`}
+                              className="text-sm truncate cursor-pointer"
+                              title={primary.filename}
+                            >
+                              {primary.filename}
+                            </label>
+                            {hasMultiple && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 shrink-0">
+                                {versions.length} versions
                               </span>
                             )}
+                            {hasMultiple && (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpanded(groupId)}
+                                className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                              >
+                                {expanded ? '▼' : '▶'}
+                              </button>
+                            )}
                           </div>
-                        )}
+                          {totalNotes > 0 && (
+                            <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                              <span className="text-green-600 dark:text-green-400 font-medium">
+                                {totalNotes} note{totalNotes !== 1 ? 's' : ''} total
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <Link
-                        href={`/a/${f.slug}`}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline shrink-0"
-                      >
-                        Open
-                      </Link>
+                      {expanded && hasMultiple && (
+                        <ul className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-600 pl-3">
+                          {versions.map((f) => {
+                            const hasAnnotations = (f.annotation_count ?? 0) > 0;
+                            return (
+                              <li key={f.id} className="flex items-center gap-2 py-0.5">
+                                <span className="text-xs text-gray-500 dark:text-gray-400 w-16 shrink-0">
+                                  v{f.version ?? 1}
+                                </span>
+                                {hasAnnotations && (
+                                  <span className="text-xs text-green-600 dark:text-green-400">
+                                    {f.annotation_count} note{(f.annotation_count ?? 0) !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                                {!hasAnnotations && (
+                                  <span className="text-xs text-gray-400 dark:text-gray-500">0 notes</span>
+                                )}
+                                <Link
+                                  href={`/a/${f.slug}`}
+                                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline ml-auto"
+                                >
+                                  Open
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </li>
                   );
                 })}

@@ -223,9 +223,17 @@ export default function LibraryPage() {
                               {primary.filename}
                             </label>
                             {hasMultiple && (
-                              <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 shrink-0">
-                                {versions.length} versions
-                              </span>
+                              <>
+                                <Link
+                                  href={`/a/versions/${primary.slug}`}
+                                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+                                >
+                                  Compare
+                                </Link>
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 shrink-0">
+                                  {versions.length} versions
+                                </span>
+                              </>
                             )}
                             {hasMultiple && (
                               <button
@@ -247,14 +255,7 @@ export default function LibraryPage() {
                         </div>
                       </div>
                       {expanded && hasMultiple && (
-                        <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-600 pl-3">
-                          <Link
-                            href={`/a/versions/${primary.slug}`}
-                            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline block py-1"
-                          >
-                            Compare versions →
-                          </Link>
-                          <ul className="space-y-1">
+                        <ul className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-600 pl-3">
                           {versions.map((f) => {
                             const hasAnnotations = (f.annotation_count ?? 0) > 0;
                             return (
@@ -279,8 +280,7 @@ export default function LibraryPage() {
                               </li>
                             );
                           })}
-                          </ul>
-                        </div>
+                        </ul>
                       )}
                     </li>
                   );

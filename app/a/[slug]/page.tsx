@@ -95,6 +95,13 @@ export default async function AudioPage({
           </h1>
           {hasMultipleVersions && (
             <div className="flex flex-wrap items-center gap-2 mt-1">
+              <Link
+                href={`/a/versions/${slug}`}
+                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Compare versions
+              </Link>
+              <span className="text-xs text-gray-400">|</span>
               <span className="text-xs text-gray-500 dark:text-gray-400">Other versions:</span>
               {otherVersions.map((v) => (
                 <Link

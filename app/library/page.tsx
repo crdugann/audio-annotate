@@ -247,7 +247,14 @@ export default function LibraryPage() {
                         </div>
                       </div>
                       {expanded && hasMultiple && (
-                        <ul className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-600 pl-3">
+                        <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-600 pl-3">
+                          <Link
+                            href={`/a/versions/${primary.slug}`}
+                            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline block py-1"
+                          >
+                            Compare versions →
+                          </Link>
+                          <ul className="space-y-1">
                           {versions.map((f) => {
                             const hasAnnotations = (f.annotation_count ?? 0) > 0;
                             return (
@@ -272,7 +279,8 @@ export default function LibraryPage() {
                               </li>
                             );
                           })}
-                        </ul>
+                          </ul>
+                        </div>
                       )}
                     </li>
                   );

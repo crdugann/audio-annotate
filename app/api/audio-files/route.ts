@@ -10,7 +10,7 @@ export async function GET() {
 
     const { data: files, error } = await supabase
       .from('audio_files')
-      .select('id, slug, filename, storage_path, duration, created_at, version, version_group_id')
+      .select('id, slug, filename, storage_path, duration, created_at, version, version_group_id, bucket_id')
       .order('created_at', { ascending: false });
 
     if (error) {

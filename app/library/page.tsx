@@ -13,12 +13,15 @@ type AudioFile = {
   created_at: string;
   version?: number;
   version_group_id?: string | null;
+  bucket_id?: string | null;
   version_count?: number;
   has_multiple_versions?: boolean;
   annotation_count?: number;
   annotated_duration?: number;
   annotated_percentage?: number | null;
 };
+
+type Bucket = { id: string; name: string; created_at: string };
 
 function groupFilesByVersion(files: AudioFile[]): Map<string, AudioFile[]> {
   const groups = new Map<string, AudioFile[]>();
@@ -34,14 +37,56 @@ function groupFilesByVersion(files: AudioFile[]): Map<string, AudioFile[]> {
   return groups;
 }
 
+function groupByBucket(
+  files: AudioFile[],
+  buckets: Bucket[]
+): { bucketId: string | null; bucketName: string; files: AudioFile[] }[] {
+  const byBucket = new Map<string | null, AudioFile[]>();
+  for (const f of files) {
+    const bid = f.bucket_id ?? null;
+    const list = byBucket.get(bid) ?? [];
+    list.push(f);
+    byBucket.set(bid, list);
+  }
+  const bucketMap = new Map(buckets.map((b) => [b.id, b]));
+  const result: { bucketId: string | null; bucketName: string; files: AudioFile[] }[] = [];
+  for (const [bid, fileList] of byBucket.entries()) {
+    const name = bid ? bucketMap.get(bid)?.name ?? 'Unknown' : 'Uncategorized';
+    result.push({ bucketId: bid, bucketName: name, files: fileList });
+  }
+  result.sort((a, b) => {
+    if (a.bucketId == null) return 1;
+    if (b.bucketId == null) return -1;
+    return a.bucketName.localeCompare(b.bucketName);
+  });
+  return result;
+}
+
 export default function LibraryPage() {
   const [files, setFiles] = useState<AudioFile[]>([]);
+  const [buckets, setBuckets] = useState<Bucket[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set());
   const [annotations, setAnnotations] = useState<AnnotationWithFile[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(true);
   const [loadingAnnotations, setLoadingAnnotations] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchBuckets() {
+      try {
+        const res = await fetch('/api/buckets');
+        const data = await res.json();
+        if (res.ok && !cancelled) setBuckets(data ?? []);
+      } catch {
+        // ignore
+      }
+    }
+    fetchBuckets();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,8 +151,17 @@ export default function LibraryPage() {
     return () => { cancelled = true; };
   }, [selectedIds, files]);
 
+  const bucketGroups = groupByBucket(files, buckets);
   const groups = groupFilesByVersion(files);
-  const groupEntries = Array.from(groups.entries());
+
+  const toggleBucketExpanded = (bucketKey: string) => {
+    setCollapsedBuckets((prev) => {
+      const next = new Set(prev);
+      if (next.has(bucketKey)) next.delete(bucketKey);
+      else next.add(bucketKey);
+      return next;
+    });
+  };
 
   const toggleGroup = (groupId: string) => {
     const versionIds = groups.get(groupId)?.map((f) => f.id) ?? [];
@@ -196,8 +250,25 @@ export default function LibraryPage() {
                   Select none
                 </button>
               </div>
-              <ul className="space-y-1 max-h-[300px] overflow-y-auto border rounded-lg p-2 bg-white dark:bg-gray-800/50">
-                {groupEntries.map(([groupId, versions]) => {
+              <ul className="space-y-1 max-h-[400px] overflow-y-auto border rounded-lg p-2 bg-white dark:bg-gray-800/50">
+                {bucketGroups.map(({ bucketId, bucketName, files: bucketFiles }) => {
+                  const bucketKey = bucketId ?? '__uncategorized__';
+                  const isBucketExpanded = !collapsedBuckets.has(bucketKey);
+                  const groupEntries = Array.from(groupFilesByVersion(bucketFiles).entries());
+                  return (
+                    <li key={bucketKey} className="border-b border-gray-200 dark:border-gray-600 last:border-0 pb-2 last:pb-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleBucketExpanded(bucketKey)}
+                        className="flex items-center gap-2 w-full text-left py-2 font-medium text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded px-1 -mx-1"
+                      >
+                        <span className={isBucketExpanded ? 'rotate-90' : ''}>▶</span>
+                        <span>{bucketName}</span>
+                        <span className="text-xs text-gray-500 font-normal">({bucketFiles.length})</span>
+                      </button>
+                      {isBucketExpanded && (
+                        <ul className="space-y-1 mt-1">
+                          {groupEntries.map(([groupId, versions]) => {
                   const primary = versions[0]!;
                   const hasMultiple = versions.length > 1;
                   const expanded = expandedGroups.has(groupId);
@@ -280,6 +351,11 @@ export default function LibraryPage() {
                               </li>
                             );
                           })}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
                         </ul>
                       )}
                     </li>

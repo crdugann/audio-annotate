@@ -20,11 +20,13 @@ Open [http://localhost:3000](http://localhost:3000). Add `.env.local` with your 
 ### 1. Upload Audio
 
 - Go to the home page (`/`)
+- (Optional) Create a **bucket** to organize files—enter a name and click **Create**
+- Select a bucket from the dropdown (or leave as "No bucket" for uncategorized)
 - Click **Choose File** or **Browse**
 - Select one or more audio files (MP3, WAV, M4A, OGG; max 50MB each)
 - Click **Upload**
 
-After upload, you’re redirected to the audio page or see a list of links for multiple files.
+After upload, you’re redirected to the audio page or see a list of links for multiple files. In the **Library** (`/library`), files are grouped by bucket.
 
 ### 2. Open Shared Audio
 
@@ -184,6 +186,8 @@ CREATE TABLE annotations (
 CREATE INDEX idx_annotations_audio_id ON annotations(audio_id);
 CREATE INDEX idx_audio_files_slug ON audio_files(slug);
 ```
+
+**Buckets (optional):** To organize files into named buckets, run the migration in `supabase-migrations/001_add_buckets.sql` in the SQL Editor.
 
 ### 3. Add Row-Level Security (RLS)
 

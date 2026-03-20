@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 type UploadResult = { slug: string; filename: string };
+type Bucket = { id: string; name: string; created_at: string };
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
@@ -11,6 +12,49 @@ export default function Home() {
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
   const [uploaded, setUploaded] = useState<UploadResult[]>([]);
+  const [buckets, setBuckets] = useState<Bucket[]>([]);
+  const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
+  const [newBucketName, setNewBucketName] = useState('');
+  const [creatingBucket, setCreatingBucket] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchBuckets() {
+      try {
+        const res = await fetch('/api/buckets');
+        const data = await res.json();
+        if (res.ok && !cancelled) setBuckets(data ?? []);
+      } catch {
+        // ignore
+      }
+    }
+    fetchBuckets();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function createBucket(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newBucketName.trim();
+    if (!name || creatingBucket) return;
+    setCreatingBucket(true);
+    setError('');
+    try {
+      const res = await fetch('/api/buckets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to create bucket');
+      setBuckets((prev) => [...prev, data]);
+      setSelectedBucketId(data.id);
+      setNewBucketName('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create bucket');
+    } finally {
+      setCreatingBucket(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,6 +72,7 @@ export default function Home() {
 
         const formData = new FormData();
         formData.append('file', file);
+        if (selectedBucketId) formData.append('bucket_id', selectedBucketId);
 
         const res = await fetch('/api/upload', {
           method: 'POST',
@@ -62,6 +107,39 @@ export default function Home() {
       >
         Browse all files & notes →
       </Link>
+
+      <div className="w-full max-w-md mb-6">
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Buckets</h2>
+        <form onSubmit={createBucket} className="flex gap-2 mb-3">
+          <input
+            type="text"
+            value={newBucketName}
+            onChange={(e) => setNewBucketName(e.target.value)}
+            placeholder="New bucket name"
+            className="flex-1 border p-2 rounded text-sm"
+          />
+          <button
+            type="submit"
+            disabled={!newBucketName.trim() || creatingBucket}
+            className="bg-gray-600 text-white py-2 px-4 rounded text-sm disabled:opacity-50"
+          >
+            {creatingBucket ? 'Creating...' : 'Create'}
+          </button>
+        </form>
+        <select
+          value={selectedBucketId ?? ''}
+          onChange={(e) => setSelectedBucketId(e.target.value || null)}
+          className="w-full border p-2 rounded text-sm"
+        >
+          <option value="">No bucket (uncategorized)</option>
+          {buckets.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full max-w-md">
         <input
           type="file"

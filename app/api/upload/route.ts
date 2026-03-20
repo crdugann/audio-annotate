@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const bucketId = (formData.get('bucket_id') as string)?.trim() || null;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
         duration: null,
         version,
         version_group_id: versionGroupId,
+        bucket_id: bucketId || null,
       })
       .select('id')
       .single();

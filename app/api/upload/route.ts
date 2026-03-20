@@ -88,7 +88,11 @@ export async function POST(request: NextRequest) {
         .eq('id', audioData.id);
     }
 
-    return NextResponse.json({ slug, id: audioData.id });
+    return NextResponse.json({
+      slug,
+      id: audioData.id,
+      bucket_id: bucketId || null,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Upload failed' },

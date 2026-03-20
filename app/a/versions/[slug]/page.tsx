@@ -149,12 +149,21 @@ export default async function VersionsComparePage({
                   ({v.annotations.length} note{v.annotations.length !== 1 ? 's' : ''})
                 </span>
               </h2>
-              <Link
-                href={`/a/${v.slug}`}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                Open full view →
-              </Link>
+              <div className="flex items-center gap-3">
+                <a
+                  href={`/api/audio/${v.slug}/download`}
+                  download={v.filename}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Download
+                </a>
+                <Link
+                  href={`/a/${v.slug}`}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Open full view →
+                </Link>
+              </div>
             </div>
             <AudioPlayer
               audioUrl={v.publicUrl}

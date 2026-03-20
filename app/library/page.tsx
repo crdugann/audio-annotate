@@ -432,6 +432,23 @@ export default function LibraryPage() {
                             >
                               {primary.filename}
                             </label>
+                            {!hasMultiple && (
+                              <>
+                                <a
+                                  href={`/api/audio/${primary.slug}/download`}
+                                  download={primary.filename}
+                                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+                                >
+                                  Download
+                                </a>
+                                <Link
+                                  href={`/a/${primary.slug}`}
+                                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+                                >
+                                  Open
+                                </Link>
+                              </>
+                            )}
                             {hasMultiple && (
                               <>
                                 <Link
@@ -481,6 +498,13 @@ export default function LibraryPage() {
                                 {!hasAnnotations && (
                                   <span className="text-xs text-gray-400 dark:text-gray-500">0 notes</span>
                                 )}
+                                <a
+                                  href={`/api/audio/${f.slug}/download`}
+                                  download={f.filename}
+                                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                                >
+                                  Download
+                                </a>
                                 <Link
                                   href={`/a/${f.slug}`}
                                   className="text-xs text-blue-600 dark:text-blue-400 hover:underline ml-auto"

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-type UploadResult = { slug: string; filename: string };
+type UploadResult = { slug: string; filename: string; bucketName: string };
 type Bucket = { id: string; name: string; created_at: string };
 
 export default function Home() {
@@ -82,13 +82,17 @@ export default function Home() {
 
         if (!res.ok) throw new Error(data.error || `Upload failed: ${file.name}`);
 
-        results.push({ slug: data.slug, filename: file.name });
+        const bucketName = selectedBucketId
+          ? buckets.find((b) => b.id === selectedBucketId)?.name ?? 'Unknown'
+          : 'Uncategorized';
+        results.push({ slug: data.slug, filename: file.name, bucketName });
         setUploaded([...results]);
       }
 
       setProgress('');
       if (results.length === 1) {
-        window.location.href = `/a/${results[0].slug}`;
+        const r = results[0]!;
+        window.location.href = `/a/${r.slug}?uploaded=${encodeURIComponent(r.filename)}&bucket=${encodeURIComponent(r.bucketName)}`;
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
@@ -174,6 +178,9 @@ export default function Home() {
                   >
                     {r.filename}
                   </Link>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {' '}was uploaded to {r.bucketName} bucket
+                  </span>
                 </li>
               ))}
             </ul>

@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import AudioPlayer, { type Annotation } from '@/components/AudioPlayer';
 import AudioNav from '@/components/AudioNav';
+import UploadSuccessBanner from '@/components/UploadSuccessBanner';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,10 +14,10 @@ export default async function AudioPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ t?: string }>;
+  searchParams: Promise<{ t?: string; uploaded?: string; bucket?: string }>;
 }) {
   const { slug } = await params;
-  const { t } = await searchParams;
+  const { t, uploaded, bucket } = await searchParams;
   const initialSeekTime = t != null ? parseFloat(t) : undefined;
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -83,6 +84,9 @@ export default async function AudioPage({
 
   return (
     <main className="min-h-screen p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      {uploaded && bucket && (
+        <UploadSuccessBanner filename={uploaded} bucketName={bucket} />
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="min-w-0">
           <h1 className="text-xl font-bold truncate" title={audioFile.filename}>
@@ -93,27 +97,37 @@ export default async function AudioPage({
               </span>
             )}
           </h1>
-          {hasMultipleVersions && (
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <Link
-                href={`/a/versions/${slug}`}
-                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                Compare versions
-              </Link>
-              <span className="text-xs text-gray-400">|</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">Other versions:</span>
-              {otherVersions.map((v) => (
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <a
+              href={`/api/audio/${slug}/download`}
+              download={audioFile.filename}
+              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Download
+            </a>
+            {hasMultipleVersions && (
+              <>
+                <span className="text-xs text-gray-400">|</span>
                 <Link
-                  key={v.id}
-                  href={`/a/${v.slug}`}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  href={`/a/versions/${slug}`}
+                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                 >
-                  v{v.version ?? '?'}
+                  Compare versions
                 </Link>
-              ))}
-            </div>
-          )}
+                <span className="text-xs text-gray-400">|</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Other versions:</span>
+                {otherVersions.map((v) => (
+                  <Link
+                    key={v.id}
+                    href={`/a/${v.slug}`}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    v{v.version ?? '?'}
+                  </Link>
+                ))}
+              </>
+            )}
+          </div>
         </div>
         <AudioNav prevSlug={prevSlug} nextSlug={nextSlug} />
       </div>

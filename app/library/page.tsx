@@ -72,6 +72,9 @@ export default function LibraryPage() {
   const [loadingFiles, setLoadingFiles] = useState(true);
   const [loadingAnnotations, setLoadingAnnotations] = useState(false);
   const [error, setError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [moveTargetBucketId, setMoveTargetBucketId] = useState<string | null>(null);
+  const [newBucketName, setNewBucketName] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -197,6 +200,81 @@ export default function LibraryPage() {
 
   const selectNone = () => {
     setSelectedIds(new Set());
+    setError('');
+  };
+
+  const refreshFiles = async () => {
+    try {
+      const res = await fetch('/api/audio-files');
+      const data = await res.json();
+      if (res.ok) setFiles(data ?? []);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleMoveToBucket = async (bucketId: string | null) => {
+    if (selectedIds.size === 0 || actionLoading) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/audio-files/batch', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio_ids: Array.from(selectedIds), bucket_id: bucketId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to move');
+      await refreshFiles();
+      setSelectedIds(new Set());
+      setMoveTargetBucketId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to move files');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCreateBucketAndMove = async () => {
+    const name = newBucketName.trim();
+    if (!name || actionLoading) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      const createRes = await fetch('/api/buckets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok) throw new Error(createData.error ?? 'Failed to create bucket');
+      await handleMoveToBucket(createData.id);
+      setBuckets((prev) => [...prev, createData]);
+      setNewBucketName('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create and move');
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0 || actionLoading) return;
+    if (!confirm(`Permanently delete ${selectedIds.size} file${selectedIds.size !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/audio-files/batch?ids=${encodeURIComponent(Array.from(selectedIds).join(','))}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to delete');
+      await refreshFiles();
+      setSelectedIds(new Set());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete files');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
@@ -250,6 +328,65 @@ export default function LibraryPage() {
                   Select none
                 </button>
               </div>
+              {selectedIds.size > 0 && (
+                <div className="mb-3 p-3 border rounded-lg bg-gray-50 dark:bg-gray-900/50 space-y-3">
+                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                    {selectedIds.size} file{selectedIds.size !== 1 ? 's' : ''} selected
+                  </p>
+                  {error && (
+                    <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+                  )}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Move to bucket:</span>
+                    <select
+                      value={moveTargetBucketId ?? ''}
+                      onChange={(e) => setMoveTargetBucketId(e.target.value || null)}
+                      className="text-xs border rounded px-2 py-1.5 bg-white dark:bg-gray-800"
+                    >
+                      <option value="">Uncategorized</option>
+                      {buckets.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveToBucket(moveTargetBucketId)}
+                      disabled={actionLoading}
+                      className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {actionLoading ? 'Moving...' : 'Move'}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Or create new:</span>
+                    <input
+                      type="text"
+                      value={newBucketName}
+                      onChange={(e) => setNewBucketName(e.target.value)}
+                      placeholder="Bucket name"
+                      className="text-xs border rounded px-2 py-1.5 w-32"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateBucketAndMove}
+                      disabled={!newBucketName.trim() || actionLoading}
+                      className="text-xs px-3 py-1.5 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+                    >
+                      Create & move
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    disabled={actionLoading}
+                    className="text-xs px-3 py-1.5 border border-red-300 text-red-600 dark:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                  >
+                    {actionLoading ? 'Deleting...' : 'Delete selected'}
+                  </button>
+                </div>
+              )}
               <ul className="space-y-1 max-h-[400px] overflow-y-auto border rounded-lg p-2 bg-white dark:bg-gray-800/50">
                 {bucketGroups.map(({ bucketId, bucketName, files: bucketFiles }) => {
                   const bucketKey = bucketId ?? '__uncategorized__';

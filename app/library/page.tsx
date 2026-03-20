@@ -401,7 +401,9 @@ export default function LibraryPage() {
                       >
                         <span className={isBucketExpanded ? 'rotate-90' : ''}>▶</span>
                         <span>{bucketName}</span>
-                        <span className="text-xs text-gray-500 font-normal">({bucketFiles.length})</span>
+                        <span className="text-xs text-gray-500 font-normal">
+                          ({bucketFiles.length} file{bucketFiles.length !== 1 ? 's' : ''})
+                        </span>
                       </button>
                       {isBucketExpanded && (
                         <ul className="space-y-1 mt-1">

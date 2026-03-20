@@ -168,7 +168,10 @@ export default function Home() {
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {uploaded.length > 0 && !loading && uploaded.length > 1 && (
           <div className="mt-4 p-4 border rounded bg-gray-50 dark:bg-gray-900/50 w-full">
-            <p className="font-medium mb-2">Uploaded ({uploaded.length} files):</p>
+            <p className="font-medium mb-2">
+              Uploaded {uploaded.length} file{uploaded.length !== 1 ? 's' : ''} to{' '}
+              {uploaded[0]?.bucketName ?? 'Uncategorized'} bucket
+            </p>
             <ul className="space-y-1">
               {uploaded.map((r) => (
                 <li key={r.slug}>
@@ -178,9 +181,6 @@ export default function Home() {
                   >
                     {r.filename}
                   </Link>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {' '}was uploaded to {r.bucketName} bucket
-                  </span>
                 </li>
               ))}
             </ul>
